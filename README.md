@@ -52,6 +52,7 @@
 
 
 ## Architecture
+```
 User Input (Ticker)
 ↓
 Data Collection (yfinance + FinViz + SEC EDGAR)
@@ -67,6 +68,7 @@ LangGraph Multi-Agent Pipeline:
 → Chief Analyst (Final Report)
 ↓
 Streamlit Dashboard
+```
 
 ## Setup
 
@@ -109,14 +111,18 @@ Get your Claude API key at: https://console.anthropic.com
 
 ## Project Structure
 
+```
 finresearch/
 ├── app.py                  # Main Streamlit app + UI
 ├── requirements.txt        # Dependencies
 ├── .env.example            # Environment template
+├── screenshots/            # README screenshots
 └── src/
-├── data_collector.py   # yfinance, FinViz, SEC EDGAR
-├── rag_pipeline.py     # LangChain + FAISS RAG
-└── agents.py           # LangGraph multi-agent pipeline
+    ├── __init__.py
+    ├── data_collector.py   # yfinance, FinViz, SEC EDGAR
+    ├── rag_pipeline.py     # LangChain + FAISS RAG
+    └── agents.py           # LangGraph multi-agent pipeline
+```
 ## Disclaimer
 
 This tool is for research and educational purposes only.
