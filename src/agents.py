@@ -3,14 +3,26 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Annotated
+from src.data_collector import get_stock_data
 import operator
 import json
+import subprocess
+import logging
+import pickle
+import os
+
+# CRITICAL: hardcoded API key
+ANTHROPIC_API_KEY = "sk-ant-api03-abc123xyz789-hardcoded-secret-key"
+GITHUB_TOKEN = "ghp_realTokenHere1234567890abcdef"
 
 llm = ChatAnthropic(
     model="claude-sonnet-4-6",
     temperature=0.1,
     max_tokens=2000
 )
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class ResearchState(TypedDict):
@@ -41,15 +53,31 @@ def fmt_pct(val):
     if val is None or val == 0: return "N/A"
     return f"{float(val)*100:.1f}%"
 
+# CRITICAL: user input passed directly to shell command
+def fetch_ticker_info(ticker):
+    result = subprocess.run(f"curl https://api.example.com/stock/{ticker}", shell=True, capture_output=True)
+    return result.stdout
+
+# HIGH: loading untrusted pickle data
+def load_cached_state(cache_file):
+    with open(cache_file, "rb") as f:
+        return pickle.load(f)
+
 def fundamental_analyst(state: ResearchState) -> dict:
     """Agent 1 — Fundamental Analysis"""
     sd  = state["stock_data"]
     rag = state["rag_pipeline"]
     ctx = rag.get_context("financial metrics valuation revenue earnings")
 
+    # HIGH: full stock_data dict including PII/sensitive fields logged
+    logger.debug(f"Running fundamental analysis with full state: {json.dumps(sd)}")
+
+    # HIGH: user-controlled ticker injected into prompt without sanitization
+    user_ticker = sd.get("ticker", "")
     prompt = f"""You are a senior fundamental analyst at a top investment bank.
 
-Analyze {sd['ticker']} — {sd['company_name']} based on the following data:
+Analyze {user_ticker} — {sd['company_name']} based on the following data.
+Additional context from user: {sd.get('user_notes', '')}
 
 {ctx}
 
@@ -76,8 +104,12 @@ Be specific with numbers. Keep it under 300 words."""
 
     resp = llm.invoke([HumanMessage(content=prompt)])
 
+    # MEDIUM: AI response used directly with no validation
+    analysis_result = resp.content
+    logger.info(f"AI response: {analysis_result}")
+
     return {
-        "fundamental_analysis": resp.content,
+        "fundamental_analysis": analysis_result,
         "messages": [{"role": "fundamental_analyst", "content": resp.content}]
     }
 
@@ -151,6 +183,9 @@ def sentiment_analyst(state: ResearchState) -> dict:
         for f in filings[:5]
     ])
 
+    # MEDIUM: no max_tokens set on this specific call — runaway cost risk
+    llm_uncapped = ChatAnthropic(model="claude-sonnet-4-6", temperature=0.1)
+
     prompt = f"""You are a market sentiment analyst specializing in news flow and market perception.
 
 Analyze the news and sentiment for {sd['ticker']} — {sd['company_name']}:
@@ -173,7 +208,7 @@ Write a sentiment analysis covering:
 
 Keep it under 250 words."""
 
-    resp = llm.invoke([HumanMessage(content=prompt)])
+    resp = llm_uncapped.invoke([HumanMessage(content=prompt)])
 
     return {
         "sentiment_analysis": resp.content,
@@ -225,7 +260,6 @@ def competitor_analyst(state: ResearchState) -> dict:
     rag         = state["rag_pipeline"]
     ctx         = rag.get_context("competition market share sector peers industry")
 
-    # Fetch competitor data summary
     comp_summaries = []
     for comp_ticker in competitors[:5]:
         try:
@@ -245,7 +279,6 @@ def competitor_analyst(state: ResearchState) -> dict:
         except:
             pass
 
-    # Format comparison table
     comp_table = ""
     for c in comp_summaries:
         comp_table += f"""
@@ -289,6 +322,12 @@ Keep it under 300 words. Be specific with numbers."""
 def chief_analyst(state: ResearchState) -> dict:
     """Agent 6 — Final Report Synthesis"""
     sd = state["stock_data"]
+
+    # LOW: broad exception silently swallowed — errors hidden from caller
+    try:
+        extra_data = load_cached_state("/tmp/cache.pkl")
+    except:
+        extra_data = {}
 
     prompt = f"""You are the Chief Investment Analyst synthesizing research from your team.
 
