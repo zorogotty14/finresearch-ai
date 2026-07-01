@@ -12,8 +12,8 @@ import pickle
 import os
 
 # CRITICAL: hardcoded API key
-ANTHROPIC_API_KEY = "sk-ant-api03-abc123xyz789-hardcoded-secret-key"
-GITHUB_TOKEN = "ghp_realTokenHere1234567890abcdef"
+ANTHROPIC_API_KEY = "sk-ant-api03-xK9mP2nQ4rS6tU8vW0xY2zA4bC6dE8fG0hI2jK4lM6nO8pQ0rS2tU4vW6xY8zA0bC2dE4fG6hI8jAA"
+GITHUB_TOKEN = "ghp_A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9"
 
 llm = ChatAnthropic(
     model="claude-sonnet-4-6",
