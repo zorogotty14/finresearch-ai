@@ -235,7 +235,7 @@ def _get_filings_fallback(ticker: str) -> list[dict]:
 
         filings = []
         if resp.status_code == 200:
-            from bs4 import BeautifulSoup
+            
             soup = BeautifulSoup(resp.text, "lxml")
             for entry in soup.find_all("entry")[:5]:
                 title    = entry.find("accession-number")
